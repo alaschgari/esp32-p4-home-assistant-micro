@@ -1,6 +1,9 @@
 esphome:
-  name: esp32-p4-devkit
-  friendly_name: "ESP32-P4 Dev Kit"
+  name: esp32-p4-satellite
+  friendly_name: "ESP32-P4 Voice Satellite"
+  project:
+    name: "waveshare.esp32-p4-micro"
+    version: "1.1"
 
 esp32:
   board: esp32-p4-evboard
@@ -13,6 +16,9 @@ esp32:
 logger:
   hardware_uart: UART0
   level: DEBUG
+  logs:
+    microphone: VERY_VERBOSE
+    voice_assistant: DEBUG
 
 # -------------------------------------------------------------------
 # NETZWERK ANBINDUNG ÜBER ETHERNET (LAN)
@@ -97,7 +103,7 @@ speaker:
 # -------------------------------------------------------------------
 media_player:
   - platform: speaker
-    name: "ESP32-P4 Speaker"
+    name: "ESP32-P4 Radio"
     id: speaker_media_player
     media_pipeline:
       speaker: media_spk_resampler
@@ -122,8 +128,6 @@ microphone:
 voice_assistant:
   id: va
   microphone: my_mic
-  # WICHTIG: Point to the resampler, which IS a Speaker component
-  # and flows into the mixer.
   speaker: announcement_spk_resampler 
   use_wake_word: true
 
@@ -136,3 +140,29 @@ switch:
     name: "Amplifier Enable"
     id: amp_enable
     restore_mode: ALWAYS_ON
+
+# -------------------------------------------------------------------
+# MANUELLE KONTROLLEN (DEBUGGING)
+# -------------------------------------------------------------------
+button:
+  - platform: template
+    name: "Manual Voice Assist Start"
+    id: manual_va_start
+    on_press:
+      - voice_assistant.start:
+      - logger.log: "Manuelle Aktivierung des Voice Assistant angefordert"
+
+  - platform: template
+    name: "Manual Voice Assist Stop"
+    id: manual_va_stop
+    on_press:
+      - voice_assistant.stop:
+
+# Status-Sensoren für Debugging
+text_sensor:
+  - platform: template
+    name: "Voice Assistant State"
+    id: va_state
+    lambda: |-
+      return id(va).is_running() ? "Listening/Running" : "Idle/Stopped";
+    update_interval: 5s
