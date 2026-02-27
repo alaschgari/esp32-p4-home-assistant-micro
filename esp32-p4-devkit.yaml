@@ -2,16 +2,15 @@ esphome:
   name: esp32-p4-satellite
   friendly_name: "ESP32-P4 Voice Satellite"
   project:
-    name: "waveshare.esp32-p4-micro"
-    version: "1.19"
+    name: "waveshare.ESP32-P4-WIFI6-DEV-KIT-MICROPHONE-FOR-HOME-ASSISTANT"
+    version: "1.20"
   on_boot:
     - priority: 100.0
       then:
         - lambda: |-
-            // Fix ES8311 Register 0x14 using the DAC object's API (framework-agnostic)
-            // Register 0x14: 0x1A enables PGA with max gain and sets Analog Mic mode.
+            // Initial analog mic fix
             id(es8311_dac).write_byte(0x14, 0x1A);
-            ESP_LOGI("es8311_fix", "Fixed Register 0x14 to 0x1A (Analog Mic Mode) via DAC object");
+            ESP_LOGI("es8311_fix", "Analog Mic Mode forced on boot");
 
 esp32:
   board: esp32-p4-evboard
@@ -107,7 +106,7 @@ speaker:
 
   - platform: resampler
     id: announcement_spk_resampler
-    output_speaker: announcement_spk_resampler
+    output_speaker: announcement_spk_mixer_input
 
 # -------------------------------------------------------------------
 # MEDIA PLAYER
@@ -134,6 +133,7 @@ microphone:
     pdm: false
     bits_per_sample: 16bit
     channel: left
+    noise_suppression_level: 2
 
 # -------------------------------------------------------------------
 # VOICE ASSISTANT
@@ -142,7 +142,34 @@ voice_assistant:
   id: va
   microphone: my_mic
   speaker: announcement_spk_resampler 
-  use_wake_word: false
+  use_wake_word: true
+  on_listening:
+    - logger.log: "Voice Assistant started listening..."
+  on_error:
+    - logger.log: "Voice Assistant Error!"
+
+# -------------------------------------------------------------------
+# EXPOSED CONTROLS (HOME ASSISTANT)
+# -------------------------------------------------------------------
+number:
+  - platform: template
+    name: "Microphone Gain"
+    id: mic_gain_control
+    min_value: 0
+    max_value: 42
+    step: 3
+    unit_of_measurement: "dB"
+    initial_value: 30
+    optimistic: true
+
+  - platform: template
+    name: "Noise Suppression Level"
+    id: ns_level_control
+    min_value: 0
+    max_value: 4
+    step: 1
+    initial_value: 2
+    optimistic: true
 
 # -------------------------------------------------------------------
 # VERSTÄRKER KONTROLLE
