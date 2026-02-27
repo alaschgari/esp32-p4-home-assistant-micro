@@ -3,7 +3,7 @@ esphome:
   friendly_name: "ESP32-P4 Voice Satellite"
   project:
     name: "waveshare.esp32-p4-micro"
-    version: "1.7"
+    version: "1.8"
 
 esp32:
   board: esp32-p4-evboard
@@ -68,15 +68,13 @@ audio_dac:
     bits_per_sample: 16bit
 
 # -------------------------------------------------------------------
-# I2S AUDIO BUS (ACHTUNG: Pins 10 und 11 testweise getauscht!)
+# I2S AUDIO BUS (Standard Belegung laut Schaltplan)
 # -------------------------------------------------------------------
 i2s_audio:
   - id: i2s_bus
     i2s_mclk_pin: GPIO13
     i2s_bclk_pin: GPIO12
-    # Standard laut Wiki: LRCK=10, DIN=11
-    # User Wunsch: Mikro auf 10
-    i2s_lrclk_pin: GPIO11 
+    i2s_lrclk_pin: GPIO10 # Passend zu Label 10 (Speaker/LRCK)
     use_legacy: false
 
 # -------------------------------------------------------------------
@@ -126,7 +124,7 @@ microphone:
   - platform: i2s_audio
     id: my_mic
     i2s_audio_id: i2s_bus
-    i2s_din_pin: GPIO10 
+    i2s_din_pin: GPIO11 # Passend zu Label 11 (Mic/DIN)
     adc_type: external
     pdm: false
     bits_per_sample: 16bit
