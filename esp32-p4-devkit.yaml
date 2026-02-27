@@ -3,7 +3,7 @@ esphome:
   friendly_name: "ESP32-P4 Voice Satellite"
   project:
     name: "waveshare.esp32-p4-micro"
-    version: "1.9"
+    version: "1.10"
 
 esp32:
   board: esp32-p4-evboard
@@ -20,7 +20,7 @@ logger:
     microphone: VERY_VERBOSE
     voice_assistant: VERY_VERBOSE
     i2s_audio: VERY_VERBOSE
-    component: VERY_VERBOSE
+    component: INFO # Zur Entlastung der CPU, nur wichtige Logs
 
 # -------------------------------------------------------------------
 # NETZWERK ANBINDUNG ÜBER ETHERNET (LAN)
@@ -63,7 +63,7 @@ audio_dac:
     address: 0x18
     use_mclk: True
     use_microphone: true
-    mic_gain: 30DB
+    mic_gain: 42DB # Erhöht auf Maximum für besseres Signal
     sample_rate: 16000
     bits_per_sample: 16bit
 
@@ -128,6 +128,7 @@ microphone:
     adc_type: external
     pdm: false
     bits_per_sample: 16bit
+    channel: left # Versuchen, den Signal-Fehler durch Kanal-Isolation zu beheben
 
 # -------------------------------------------------------------------
 # VOICE ASSISTANT (Manual Trigger Only)
