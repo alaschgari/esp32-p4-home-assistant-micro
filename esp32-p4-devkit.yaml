@@ -3,7 +3,7 @@ esphome:
   friendly_name: "ESP32-P4 Voice Satellite"
   project:
     name: "waveshare.esp32-p4-micro"
-    version: "1.5"
+    version: "1.6"
 
 esp32:
   board: esp32-p4-evboard
@@ -128,7 +128,6 @@ microphone:
     adc_type: external
     pdm: false
     bits_per_sample: 16bit
-    channel: mono
 
 sensor:
   - platform: sound_level
