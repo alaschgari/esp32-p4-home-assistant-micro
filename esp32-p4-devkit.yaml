@@ -3,7 +3,7 @@ esphome:
   friendly_name: "ESP32-P4 Voice Satellite"
   project:
     name: "waveshare.ESP32-P4-WIFI6-DEV-KIT-MICROPHONE-FOR-HOME-ASSISTANT"
-    version: "1.20"
+    version: "1.21"
   on_boot:
     - priority: 100.0
       then:
@@ -133,7 +133,6 @@ microphone:
     pdm: false
     bits_per_sample: 16bit
     channel: left
-    noise_suppression_level: 2
 
 # -------------------------------------------------------------------
 # VOICE ASSISTANT
@@ -143,6 +142,7 @@ voice_assistant:
   microphone: my_mic
   speaker: announcement_spk_resampler 
   use_wake_word: true
+  noise_suppression_level: 2  # Hier ist der richtige Platz
   on_listening:
     - logger.log: "Voice Assistant started listening..."
   on_error:
