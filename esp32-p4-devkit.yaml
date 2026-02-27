@@ -3,7 +3,7 @@ esphome:
   friendly_name: "ESP32-P4 Voice Satellite"
   project:
     name: "waveshare.esp32-p4-micro"
-    version: "1.8"
+    version: "1.9"
 
 esp32:
   board: esp32-p4-evboard
@@ -74,7 +74,7 @@ i2s_audio:
   - id: i2s_bus
     i2s_mclk_pin: GPIO13
     i2s_bclk_pin: GPIO12
-    i2s_lrclk_pin: GPIO10 # Passend zu Label 10 (Speaker/LRCK)
+    i2s_lrclk_pin: GPIO10 # LRCK / Taktleitung
     use_legacy: false
 
 # -------------------------------------------------------------------
@@ -124,17 +124,10 @@ microphone:
   - platform: i2s_audio
     id: my_mic
     i2s_audio_id: i2s_bus
-    i2s_din_pin: GPIO11 # Passend zu Label 11 (Mic/DIN)
+    i2s_din_pin: GPIO11 # Das Onboard-Mikrofon
     adc_type: external
     pdm: false
     bits_per_sample: 16bit
-
-sensor:
-  - platform: sound_level
-    name: "Microphone Noise Level"
-    id: my_sound_level
-    microphone: my_mic
-    update_interval: 1s
 
 # -------------------------------------------------------------------
 # VOICE ASSISTANT (Manual Trigger Only)
