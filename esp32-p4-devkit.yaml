@@ -3,7 +3,7 @@ esphome:
   friendly_name: "ESP32-P4 Voice Satellite"
   project:
     name: "waveshare.esp32-p4-micro"
-    version: "1.1"
+    version: "1.2"
 
 esp32:
   board: esp32-p4-evboard
@@ -19,6 +19,7 @@ logger:
   logs:
     microphone: VERY_VERBOSE
     voice_assistant: DEBUG
+    i2s_audio: DEBUG
 
 # -------------------------------------------------------------------
 # NETZWERK ANBINDUNG ÜBER ETHERNET (LAN)
@@ -58,8 +59,11 @@ audio_dac:
     id: es8311_dac
     i2c_id: bus_a
     address: 0x18
+    use_mclk: True
     use_microphone: true
-    mic_gain: 30DB
+    mic_gain: 42DB
+    sample_rate: 16000
+    bits_per_sample: 16bit
 
 # -------------------------------------------------------------------
 # I2S AUDIO BUS
@@ -165,4 +169,4 @@ text_sensor:
     id: va_state
     lambda: |-
       return id(va).is_running() ? "Listening/Running" : "Idle/Stopped";
-    update_interval: 5s
+    update_interval: 2s
