@@ -3,7 +3,7 @@ esphome:
   friendly_name: "ESP32-P4 Voice Satellite"
   project:
     name: "waveshare.esp32-p4-micro"
-    version: "1.12"
+    version: "1.13"
 
 esp32:
   board: esp32-p4-evboard
@@ -63,7 +63,7 @@ audio_dac:
     address: 0x18
     use_mclk: True
     use_microphone: true
-    mic_gain: 42DB
+    mic_gain: 30DB # Reduziert für bessere Sprachqualität
     sample_rate: 16000
     bits_per_sample: 16bit
 
@@ -128,7 +128,7 @@ microphone:
     adc_type: external
     pdm: false
     bits_per_sample: 16bit
-    channel: left # Zurück auf 'left', da 'mono' vom Validator abgelehnt wird
+    channel: left
 
 # -------------------------------------------------------------------
 # VOICE ASSISTANT (Manual Trigger Only)
