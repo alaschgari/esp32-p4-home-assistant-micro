@@ -39,7 +39,7 @@ ethernet:
 # -------------------------------------------------------------------
 api:
   encryption:
-    key: "DEIN_GENERIERTER_ENCRYPTION_KEY"
+    key: "9vP+H6+8vX/yXn7xP7+9vX/yXn7xP7+9vX/yXn7xP78="
 
 ota:
   - platform: esphome
