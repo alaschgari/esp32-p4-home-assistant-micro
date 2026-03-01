@@ -11,6 +11,7 @@ esphome:
     # notification_pcm.h contains the binary PCM data for the notification 'pling'
     # This avoids using MP3/WAV decoders that would consume too much RAM (OOM)
     - notification_pcm.h
+    - custom_udp.h
   on_boot:
     - priority: -200
       then:
@@ -50,6 +51,11 @@ logger:
     api.connection: INFO
     mdns: INFO
     safe_mode: INFO
+
+globals:
+  - id: has_tts_response
+    type: bool
+    initial_value: 'false'
 
 # -------------------------------------------------------------------
 # NETWORK CONNECTIVITY (Ethernet)
@@ -137,41 +143,17 @@ speaker:
     audio_dac: es8311_dac
     channel: mono
     num_channels: 1
-    buffer_duration: 500ms
+    # Increased buffer to handle network jitter and prevent TTS dropping out
+    buffer_duration: 1000ms
     sample_rate: 16000
     bits_per_sample: 16bit
 
-  - platform: mixer
-    id: main_audio_mixer
-    output_speaker: i2s_speaker_out
-    source_speakers:
-      - id: media_spk_mixer_input
-      - id: announcement_spk_mixer_input
-
-  - platform: resampler
-    id: media_spk_resampler
-    output_speaker: media_spk_mixer_input
-
   - platform: resampler
     id: announcement_spk_resampler
-    output_speaker: announcement_spk_mixer_input
+    output_speaker: i2s_speaker_out
 
 # -------------------------------------------------------------------
-# MEDIA PLAYER (RADIO & ANNOUNCEMENTS)
-# -------------------------------------------------------------------
-media_player:
-  - platform: speaker
-    name: "ESP32-P4 Radio"
-    id: speaker_media_player
-    media_pipeline:
-      speaker: media_spk_resampler
-      num_channels: 1
-    announcement_pipeline:
-      speaker: announcement_spk_resampler
-      num_channels: 1
-    # Required for streaming audio formats like proxy/m3u8
-    codec_support_enabled: true
-
+# MICROPHONE CONFIGURATION
 # -------------------------------------------------------------------
 # MICROPHONE CONFIGURATION
 # -------------------------------------------------------------------
@@ -191,9 +173,6 @@ micro_wake_word:
     - model: hey_jarvis
       probability_cutoff: 0.6
       sliding_window_size: 5
-    - model: okay_nabu
-      probability_cutoff: 0.5
-      sliding_window_size: 5
   on_wake_word_detected:
     - logger.log:
         format: ">>> WAKE WORD DETECTED! <<<"
@@ -203,7 +182,11 @@ micro_wake_word:
     # RELEVANT: Stop MWW immediately to release the I2S lock
     # This allows the Voice Assistant pipeline to prepare the mic.
     - micro_wake_word.stop:
-    # Small delay to ensure the driver is ready for the handover
+    # Wake up the Devolo Giga Bridge from power-saving mode
+    # A single UDP dummy packet before starting the audio stream "opens" the connection
+    - lambda: |-
+        send_dummy_udp((const char*)"192.168.178.26");
+    # Small delay to ensure the driver and network are ready
     - delay: 100ms
     # Start the Voice Assistant (no sound here to be as snappy as possible!)
     - voice_assistant.start:
@@ -215,11 +198,14 @@ voice_assistant:
   id: va
   microphone: my_mic
   speaker: announcement_spk_resampler
-  noise_suppression_level: 2
+  noise_suppression_level: 1
   auto_gain: 31dBFS
   volume_multiplier: 1.0
 
   on_listening:
+    - globals.set:
+        id: has_tts_response
+        value: 'false'
     - logger.log:
         level: WARN
         format: "VA: Listening..."
@@ -232,21 +218,26 @@ voice_assistant:
         format: "VA: Speech detected, stopping mic for feedback..."
     - lambda: |-
         id(va_state).publish_state("Processing...");
-    # STEP 1: Manually stop the mic so the Speaker can acquire the I2S Bus lock
+    # STEP 1: Manually stop the Wake Word engine so the Speaker can acquire the I2S Bus lock
+    - micro_wake_word.stop:
+    # We ALSO explicitly stop the mic, just to be absolutely certain the bus is freed
     - lambda: 'id(my_mic).stop();'
     # STEP 2: Wait 300ms for the driver to fully release the hardware bus
     - delay: 300ms
     # STEP 3: Play 'Primer' (short silence) to wake up the DMA/DAC pipeline
     - lambda: |-
         std::vector<uint8_t> primer(3200, 0);
-        id(announcement_spk_mixer_input).play(primer.data(), primer.size());
+        id(announcement_spk_resampler).play(primer.data(), primer.size());
     - delay: 200ms
     # STEP 4: Play the actual notification sound ('Pling') from embedded PCM array
     # This array is defined in notification_pcm.h as PROGMEM to save RAM.
     - lambda: |-
-        id(announcement_spk_mixer_input).play(NOTIFICATION_PCM, NOTIFICATION_PCM_SIZE);
-    # STEP 5: Wait 1000ms for player to finish before starting the next pipeline step
-    - delay: 1000ms
+        id(announcement_spk_resampler).play(NOTIFICATION_PCM, NOTIFICATION_PCM_SIZE);
+    # STEP 5: Wait dynamically for the player to finish before starting the next pipeline step
+    - wait_until:
+        timeout: 1000ms
+        condition:
+          lambda: 'return !id(i2s_speaker_out).is_running();'
     - logger.log:
         level: WARN
         format: "VA: Feedback finished, I2S bus ready for response"
@@ -273,6 +264,19 @@ voice_assistant:
         format: "VA: TTS Finished"
 
   on_tts_stream_start:
+    - globals.set:
+        id: has_tts_response
+        value: 'true'
+    # CRITICAL FALLBACK: Ensure the wake word model releases its lock BEFORE the speaker stream starts!
+    # Without this, the speaker might crash with "Parent I2S bus not free"
+    - micro_wake_word.stop:
+    - lambda: 'id(my_mic).stop();'
+    # Send a tiny silent primer to wake up the DAC and amplifier
+    # This ensures no syllables are cut off while hardware powers up
+    - lambda: |-
+        std::vector<uint8_t> primer(3200, 0);
+        id(announcement_spk_resampler).play(primer.data(), primer.size());
+    - delay: 300ms
     - logger.log:
         level: WARN
         format: "VA: Audio stream starting..."
@@ -310,23 +314,25 @@ script:
   - id: wait_and_restart_wakeword
     mode: restart
     then:
-      # Wait up to 10s for the speaker to actually start (async delay)
-      - wait_until:
-          timeout: 10s
+      - if:
           condition:
-            lambda: 'return id(i2s_speaker_out).is_running();'
-      - logger.log:
-          level: WARN
-          format: "Speaker active, waiting for end..."
-      # Wait up to 60s for the response to finish
-      - wait_until:
-          timeout: 60s
-          condition:
-            lambda: 'return !id(i2s_speaker_out).is_running();'
+            lambda: 'return id(has_tts_response);'
+          then:
+            - wait_until:
+                timeout: 2s
+                condition:
+                  lambda: 'return id(i2s_speaker_out).is_running();'
+            - logger.log:
+                level: WARN
+                format: "Speaker active, waiting for end..."
+            - wait_until:
+                timeout: 60s
+                condition:
+                  lambda: 'return !id(i2s_speaker_out).is_running();'
       - logger.log:
           level: WARN
           format: "Speaker stopped, restarting Wake Word..."
-      - delay: 500ms
+      - delay: 100ms
       - micro_wake_word.start:
       - lambda: |-
           id(va_state).publish_state("Ready (Hey Jarvis)");
@@ -425,7 +431,7 @@ button:
               data.push_back(sample & 0xFF);
               data.push_back((sample >> 8) & 0xFF);
           }
-          id(announcement_spk_mixer_input).play(data.data(), data.size());
+          id(announcement_spk_resampler).play(data.data(), data.size());
           ESP_LOGI("test", "Test tone played");
       - delay: 2000ms
       - micro_wake_word.start:
