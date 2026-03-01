@@ -4,12 +4,12 @@ This repository contains a high-performance ESPHome configuration for the **Wave
 
 ## Features
 
-- ⚡ **Ultra-Fast Response**: Optimized I2S handover delays (~450ms) for near-instant voice recognition after wake word detection.
-- 🎙️ **Micro Wake Word**: Supports "Hey Jarvis" and "Okay Nabu" on-device wake word detection.
-- 🔊 **Stable Audio Pipeline**: Uses a custom PCM-to-C-header embedding strategy to avoid `ESP_ERR_NO_MEM` crashes common with MP3/WAV decoders on ESP32.
-- 🌐 **Ethernet Optimized**: Uses the onboard IP101 PHY for reliable, low-latency connectivity (Wi-Fi is disabled to save resources).
+- ⚡ **Ultra-Fast Response**: Optimized I2S handover delays and strict hardware release rules to prevent bus locking.
+- 🎙️ **Micro Wake Word**: Supports on-device wake word detection ("Hey Jarvis").
+- 🔊 **Standalone Audio Pipeline**: Avoids `ESP_ERR_NO_MEM` crashes by skipping heavy MP3/WAV decoders. Instead, uses an optimized, built-in algorithmic sine-wave generator in C++ for notification sounds.
+- 🌐 **Ethernet Optimized**: Uses the onboard IP101 PHY for reliable, low-latency connectivity (Wi-Fi is disabled to save resources) and includes a custom UDP "Wakeup Ping" to keep LAN Powerline adapters active.
+- ⚙️ **Plug & Play Configuration**: 100% self-contained in a single YAML file with an easy-to-use `substitutions` block at the top. No external files needed!
 - 🎛️ **Runtime Controls**: Volume, Microphone Gain, and Noise Suppression levels are exposed as entities in Home Assistant.
-- 🛠️ **Diagnostic Tools**: Built-in speaker test switch and system health diagnostics button.
 
 ## Hardware Configuration (Waveshare ESP32-P4)
 
@@ -35,17 +35,14 @@ The ESP32-P4 uses a single I2S bus for both input (Mic) and output (Speaker). To
 4. **Start** the next component.
 
 ### Memory Optimization
-Standard ESPHome `play_file` actions for MP3 or WAV often cause `ESP_ERR_NO_MEM` due to the large buffers required by decoders. This project solves this by:
-1. Converting notification sounds to raw **16kHz 16-bit Mono PCM**.
-2. Embedding the raw bytes into a C header file (`notification_pcm.h`) using `PROGMEM`.
-3. Playing the raw bytes directly via `id(mixer).play()`, which consumes zero additional heap memory.
+Standard ESPHome `play_file` actions for MP3 or WAV often cause `ESP_ERR_NO_MEM` due to the large buffers required by decoders. This project solves this by synthesizing the Voice Assistant notification 'Pling' mathmetically in real-time. This saves over 32KB of flash memory and makes the configuration fully standalone without requiring external sound files.
 
 ## How to use
 
-1. Copy `esp32-p4-devkit.yaml` and `notification_pcm.h` to your ESPHome configuration directory.
-2. Update the `!secret` values (encryption key, etc.) in your `secrets.yaml`.
+1. Copy `esp32-p4-devkit.yaml` to your ESPHome configuration directory. 
+2. Update the variables in the `substitutions` block at the very top of the file to match your `secrets.yaml` (e.g., your Home Assistant IP, OTA password, and Encryption key).
 3. Flash the firmware to your Waveshare ESP32-P4.
-4. In Home Assistant, go to **Settings > Voice Assistants** and ensure your entities (Lights, etc.) are **Exposed** to the satellite.
+4. In Home Assistant, go to **Settings > Voice Assistants** and ensure your entities are **Exposed** to the satellite.
 
 ## License
 
